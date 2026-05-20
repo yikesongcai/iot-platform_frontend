@@ -19,10 +19,14 @@
                 clearable
             >
               <el-option label="全部" value="" />
-              <el-option label="设备检索" value="device_search" />
-              <el-option label="用户登录" value="user_login" />
-              <el-option label="设备告警" value="device_alert" />
-              <el-option label="设备上报" value="device_report" />
+              <el-option label="登录" value="登录" />
+              <el-option label="设备注册" value="设备注册" />
+              <el-option label="修改" value="修改" />
+              <el-option label="删除" value="删除" />
+              <el-option label="查询" value="查询" />
+              <el-option label="新增" value="新增" />
+              <el-option label="指令下发" value="指令下发" />
+              <el-option label="其他" value="其他" />
             </el-select>
           </el-form-item>
           <el-form-item label="时间范围">
@@ -85,235 +89,52 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { formatDateTime } from '@/utils/dateUtil' // 假设有一个日期格式化工具
+import axios from 'axios'
 
-// 搜索表单
-const searchForm = ref({
-  logType: '',
-  timeRange: []
-})
-
-// 表格数据
+const searchForm = ref({ logType: '', timeRange: [] })
 const tableData = ref([])
-const allData = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 
-// 从告警列表导入的告警数据（模拟）
-const alertData = [
-  {
-    deviceId: 1,
-    productKey: 'd604229e2d8bce7b',
-    title: '土壤传感器',
-    content: '设备电量过低',
-    kinds: 'urgency',
-    create_time: '2024-06-25 10:53:31'
-  },
-  {
-    deviceId: 2,
-    productKey: 'a1b2c3d4e5f6g7h8',
-    title: '温湿度传感器',
-    content: '温度超过阈值(30°C)',
-    kinds: 'normal',
-    create_time: '2024-06-25 09:15:22'
-  },
-  {
-    deviceId: 3,
-    productKey: 'i9j8k7l6m5n4o3p2',
-    title: '光照传感器',
-    content: '光照强度不足',
-    kinds: 'critical',
-    create_time: '2024-06-24 14:30:45'
-  }
-]
-
-// 生成符合模板格式的假数据
-const generateMockData = () => {
-  const now = new Date()
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-
-  const mockData = []
-
-  // 1. 生成设备检索日志 (30%)
-  for (let i = 0; i < 30; i++) {
-    const randomTime = new Date(
-        oneWeekAgo.getTime() + Math.random() * (now.getTime() - oneWeekAgo.getTime())
-    )
-
-    mockData.push({
-      id: mockData.length + 1,
-      time: formatDateTime(randomTime),
-      timestamp: randomTime.getTime(),
-      type: 'device_search',
-      content: `检索到${Math.floor(Math.random() * 20) + 1}条数据`
-    })
-  }
-
-  // 2. 生成用户登录日志 (20%)
-  const users = ['admin', 'operator', 'viewer', 'guest']
-  for (let i = 0; i < 20; i++) {
-    const randomTime = new Date(
-        oneWeekAgo.getTime() + Math.random() * (now.getTime() - oneWeekAgo.getTime())
-    )
-    const user = users[Math.floor(Math.random() * users.length)]
-
-    mockData.push({
-      id: mockData.length + 1,
-      time: formatDateTime(randomTime),
-      timestamp: randomTime.getTime(),
-      type: 'user_login',
-      content: `传入的用户信息User(userId=null, username=${user}, password=******)`
-    })
-  }
-
-  // 3. 生成设备告警日志 (20%) - 与告警列表一致
-  for (let i = 0; i < alertData.length; i++) {
-    const alert = alertData[i]
-    const alertTime = new Date(alert.create_time)
-
-    mockData.push({
-      id: mockData.length + 1,
-      time: alert.create_time,
-      timestamp: alertTime.getTime(),
-      type: 'device_alert',
-      content: `告警内容：Device(deviceId=${alert.deviceId}, productKey=${alert.productKey}, title=${alert.title}, content="${alert.content}", kinds="${alert.kinds}", create_time=${alert.create_time})`
-    })
-  }
-
-  // 4. 生成设备上报日志 (30%)
-  const devices = [
-    { id: 1, productKey: 'd604229e2d8bce7b', title: '土壤传感器' },
-    { id: 2, productKey: 'a1b2c3d4e5f6g7h8', title: '温湿度传感器' },
-    { id: 3, productKey: 'i9j8k7l6m5n4o3p2', title: '光照传感器' }
-  ]
-
-  const reportContents = [
-    '{"temperature": 25.6, "humidity": 60.2}',
-    '{"illumination": 35}',
-    '{"soil_moisture": 45.8}',
-    '{"co2": 420}',
-    '{"status": "normal"}'
-  ]
-
-  for (let i = 0; i < 30; i++) {
-    const randomTime = new Date(
-        oneWeekAgo.getTime() + Math.random() * (now.getTime() - oneWeekAgo.getTime())
-    )
-    const device = devices[Math.floor(Math.random() * devices.length)]
-    const content = reportContents[Math.floor(Math.random() * reportContents.length)]
-
-    mockData.push({
-      id: mockData.length + 1,
-      time: formatDateTime(randomTime),
-      timestamp: randomTime.getTime(),
-      type: 'device_report',
-      content: `上报内容:Device(deviceId=${device.id}, productKey=${device.productKey}, title="${device.title}", content=${content}，create_time=${formatDateTime(randomTime)})`
-    })
-  }
-
-  // 按时间倒序排序
-  return mockData.sort((a, b) => b.timestamp - a.timestamp)
-}
-
-// 获取日志类型对应的颜色
 const getLogTypeStyle = (type) => {
-  const map = {
-    device_search: '',
-    user_login: 'success',
-    device_alert: 'warning',
-    device_report: 'info'
-  }
+  const map = { '登录': 'success', '删除': 'danger', '修改': 'warning', '设备注册': 'primary', '指令下发': 'info' }
   return map[type] || ''
 }
 
-// 获取日志类型对应的文本
-const getLogTypeText = (type) => {
-  const map = {
-    device_search: '设备检索',
-    user_login: '用户登录',
-    device_alert: '设备告警',
-    device_report: '设备上报'
-  }
-  return map[type] || type
-}
+const getLogTypeText = (type) => type
 
-// 获取表格数据
-const fetchData = () => {
+const fetchData = async () => {
   loading.value = true
-  // 模拟API请求延迟
-  setTimeout(() => {
-    // 只在初始加载时生成数据
-    if (allData.value.length === 0) {
-      allData.value = generateMockData()
+  try {
+    const params = { page: currentPage.value, pageSize: pageSize.value }
+    if (searchForm.value.logType) params.logType = searchForm.value.logType
+    const res = await axios.get('http://localhost:8084/system-log/page', { params })
+    if (res.data?.code === 0) {
+      const pageData = res.data.data
+      tableData.value = (pageData.records || []).map(r => ({
+        id: r.id,
+        time: r.createTime,
+        type: r.logType,
+        content: r.content
+      }))
+      total.value = pageData.total || 0
     }
-
-    // 应用搜索条件
-    let filteredData = [...allData.value]
-    if (searchForm.value.logType) {
-      filteredData = filteredData.filter(item =>
-          item.type === searchForm.value.logType
-      )
-    }
-    if (searchForm.value.timeRange && searchForm.value.timeRange.length === 2) {
-      const [start, end] = searchForm.value.timeRange
-      const startTime = new Date(start).getTime()
-      const endTime = new Date(end).getTime()
-
-      filteredData = filteredData.filter(item => {
-        return item.timestamp >= startTime && item.timestamp <= endTime
-      })
-    }
-
-    total.value = filteredData.length
-
-    // 分页处理
-    const start = (currentPage.value - 1) * pageSize.value
-    const end = start + pageSize.value
-    tableData.value = filteredData.slice(start, end)
-
+  } catch (e) {
+    console.error('获取日志失败:', e)
+  } finally {
     loading.value = false
-  }, 500)
-}
-
-// 搜索
-const handleSearch = () => {
-  currentPage.value = 1
-  fetchData()
-}
-
-// 重置搜索条件但不重置数据
-const resetSearch = () => {
-  searchForm.value = {
-    logType: '',
-    timeRange: []
   }
-  currentPage.value = 1
-  fetchData()
 }
 
-// 分页大小变化
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  fetchData()
-}
+const handleSearch = () => { currentPage.value = 1; fetchData() }
+const resetSearch = () => { searchForm.value = { logType: '', timeRange: [] }; currentPage.value = 1; fetchData() }
+const handleSizeChange = (val) => { pageSize.value = val; fetchData() }
+const handleCurrentChange = (val) => { currentPage.value = val; fetchData() }
+const handleDetail = (row) => { console.log('日志详情:', row) }
 
-// 当前页变化
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  fetchData()
-}
-
-// 查看详情
-const handleDetail = (row) => {
-  console.log('查看日志详情:', row)
-  // 这里可以打开详情对话框
-}
-
-onMounted(() => {
-  fetchData()
-})
+onMounted(() => { fetchData() })
 </script>
 
 <style scoped>

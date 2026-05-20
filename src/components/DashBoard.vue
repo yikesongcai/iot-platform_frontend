@@ -34,9 +34,7 @@
           <div class="card-info">
             <span class="card-title">总设备数量</span>
             <span class="card-value">{{ panelData.totalDevices || 0 }}</span>
-            <span class="card-trend up-trend">
-              <el-icon><Top /></el-icon> 5.2%
-            </span>
+            <span class="card-trend normal-trend">共 {{ panelData.totalDevices || 0 }} 台</span>
           </div>
         </div>
       </el-card>
@@ -49,9 +47,7 @@
           <div class="card-info">
             <span class="card-title">在线设备</span>
             <span class="card-value">{{ panelData.onlineDevices || 0 }}</span>
-            <span class="card-trend up-trend">
-              <el-icon><Top /></el-icon> 3.8%
-            </span>
+            <span class="card-trend normal-trend">在线率 {{ onlineRate }}%</span>
           </div>
         </div>
       </el-card>
@@ -64,9 +60,7 @@
           <div class="card-info">
             <span class="card-title">上报消息</span>
             <span class="card-value">{{ panelData.upMessages || 0 }}</span>
-            <span class="card-trend down-trend">
-              <el-icon><Bottom /></el-icon> 1.2%
-            </span>
+            <span class="card-trend normal-trend">累计上报</span>
           </div>
         </div>
       </el-card>
@@ -79,9 +73,7 @@
           <div class="card-info">
             <span class="card-title">告警数量</span>
             <span class="card-value">{{ panelData.warnMessages || 0 }}</span>
-            <span class="card-trend up-trend">
-              <el-icon><Top /></el-icon> 2.4%
-            </span>
+            <span class="card-trend normal-trend">需关注</span>
           </div>
         </div>
       </el-card>
@@ -102,7 +94,7 @@
 
 <script setup>
 import EnvironmentDataCard from '@/components/EnvironmentDataCard.vue'
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 import {
@@ -110,8 +102,6 @@ import {
   Connection,
   Bell,
   DataLine,
-  Top,
-  Bottom,
   Cpu,
   CaretTop,
   CaretBottom
@@ -166,6 +156,12 @@ const fetchPanelData = async () => {
   }
 }
 
+// 在线率
+const onlineRate = computed(() => {
+  if (!panelData.value.totalDevices || panelData.value.totalDevices === 0) return 0
+  return ((panelData.value.onlineDevices / panelData.value.totalDevices) * 100).toFixed(0)
+})
+
 // 格式化CPU使用率
 const formatCpuUsage = (usage) => {
   if (usage < 0) return 'N/A'
@@ -187,29 +183,51 @@ const initCharts = () => {
   // initMessageTrendChart()
 }
 
-// 初始化设备类型图表（示例数据，需根据实际API调整）
-const initDeviceTypeChart = () => {
+// 设备类型名称映射
+const typeNameMap = {
+  temperature: '温度传感器',
+  humidity: '湿度传感器',
+  co2: 'CO2传感器',
+  light: '光照传感器'
+}
+
+// 初始化设备类型图表（从设备列表获取真实分布）
+const initDeviceTypeChart = async () => {
   const chartDom = document.getElementById('deviceTypeChart')
   if (!chartDom) return
 
-  deviceTypeChart = echarts.init(chartDom)
-  const option = {
-    tooltip: {
-      trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
-    },
-    series: [{
-      name: '设备类型',
-      type: 'pie',
-      data: [
-        { value: panelData.value.totalDevices * 0.25, name: '二氧化碳传感器' },
-        { value: panelData.value.totalDevices * 0.25, name: '温度传感器' },
-        { value: panelData.value.totalDevices * 0.25, name: '光照传感器' },
-        { value: panelData.value.totalDevices * 0.25, name: '湿度传感器' }
-      ]
-    }]
+  if (!deviceTypeChart) {
+    deviceTypeChart = echarts.init(chartDom)
   }
-  deviceTypeChart.setOption(option)
+
+  try {
+    const res = await axios.post('http://localhost:8084/device/list', {})
+    if (res.data?.code === 0) {
+      const devices = res.data.data || []
+      const typeCount = {}
+      devices.forEach(d => {
+        const type = d.thingModel || 'unknown'
+        typeCount[type] = (typeCount[type] || 0) + 1
+      })
+      const data = Object.entries(typeCount).map(([type, count]) => ({
+        value: count,
+        name: typeNameMap[type] || type
+      }))
+      deviceTypeChart.setOption({
+        tooltip: {
+          trigger: 'item',
+          formatter: '{a} <br/>{b}: {c} ({d}%)'
+        },
+        series: [{
+          name: '设备类型',
+          type: 'pie',
+          data: data.length > 0 ? data : [{ value: 1, name: '暂无设备' }]
+        }]
+      })
+    }
+  } catch (e) {
+    console.error('获取设备分布失败:', e)
+  }
 }
 
 // // 初始化消息趋势图表（示例数据，需根据实际API调整）

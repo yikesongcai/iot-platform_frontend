@@ -94,6 +94,10 @@
     color: #4caf50;
 }
 
+.normal-trend {
+    color: #757575;
+}
+
 .chart-area {
     display: grid;
     grid-template-columns: 1fr 1fr;
